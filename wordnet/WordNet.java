@@ -9,13 +9,13 @@ import edu.princeton.cs.algs4.BST;
 import edu.princeton.cs.algs4.ResizingArrayQueue;
 
 public class WordNet {
-  String[] glosses;
-  String[] synsets;
+  private String[] glosses;
+  private String[] synsets;
   //BST<String,int> nouns;
-  BST<String,ResizingArrayQueue<Integer>> nouns;
-  Digraph DAG;
-  SAP sap;
-  int size;
+  private BST<String,ResizingArrayQueue<Integer>> nouns;
+  private Digraph DAG;
+  private SAP sap;
+  private int size;
 
    // constructor takes the name of the two input files
   public WordNet(String synset, String hypernyms) {

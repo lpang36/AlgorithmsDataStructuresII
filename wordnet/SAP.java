@@ -2,13 +2,14 @@ import java.util.Iterator;
 import java.lang.Integer;
 import java.lang.IllegalArgumentException;
 import edu.princeton.cs.algs4.Digraph;
+import edu.princeton.cs.algs4.In;
 
 public class SAP {
-  Digraph graph;
-  int currentBest;
-  int currentAnc;
-  int totalMin;
-  int totalAnc;
+  private Digraph graph;
+  private int currentBest;
+  private int currentAnc;
+  private int totalMin;
+  private int totalAnc;
   
    // constructor takes a digraph (not necessarily a DAG)
   public SAP(Digraph G) {
@@ -26,7 +27,7 @@ public class SAP {
     }
     Iterable<Integer> adj = graph.adj(v);
     for (int temp : adj) {
-      if (visitedv[temp]==-1)
+      if (visitedv[temp]==-1||depth<visitedv[temp])
         DFSHelper(temp,depth+1,visitedv,visitedw);
     }
   }
@@ -60,6 +61,8 @@ public class SAP {
 
    // length of shortest ancestral path between any vertex in v and any vertex in w; -1 if no such path
   public int length(Iterable<Integer> v, Iterable<Integer> w) {
+    if (v==null||w==null)
+      throw new IllegalArgumentException();
     totalMin = Integer.MAX_VALUE;
     totalAnc = -1;
     for (int vint : v) {
@@ -81,11 +84,16 @@ public class SAP {
 
    // a common ancestor that participates in shortest ancestral path; -1 if no such path
   public int ancestor(Iterable<Integer> v, Iterable<Integer> w) {
+    if (v==null||w==null)
+      throw new IllegalArgumentException();
     length(v,w);
     return totalAnc;
   }
 
    // do unit testing of this class
   public static void main(String[] args) {
+    SAP sap = new SAP(new Digraph(new In("digraph2.txt")));
+    System.out.println(sap.length(1,5));
+    System.out.println(sap.ancestor(5,1));
   }
 }

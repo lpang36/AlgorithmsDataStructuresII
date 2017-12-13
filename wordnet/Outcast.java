@@ -1,7 +1,7 @@
 import java.lang.Integer;
 
 public class Outcast {
-  WordNet net;
+  private WordNet net;
   public Outcast(WordNet wordnet) {
     net = wordnet;
   }// constructor takes a WordNet object
