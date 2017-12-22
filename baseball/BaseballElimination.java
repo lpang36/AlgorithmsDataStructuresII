@@ -2,6 +2,7 @@ import java.util.Hashtable;
 import java.lang.Integer;
 import java.util.Iterator;
 import java.lang.IllegalArgumentException;
+import java.lang.Math;
 import edu.princeton.cs.algs4.In;
 import edu.princeton.cs.algs4.ResizingArrayQueue;
 
@@ -12,7 +13,7 @@ public class BaseballElimination {
     int capacity;
     int flow;
     FlowEdge(FlowNode f, FlowNode t) {
-      FlowEdge(f,t,Integer.MAX_VALUE);
+      this(f,t,Integer.MAX_VALUE);
     }
     FlowEdge(FlowNode f, FlowNode t, int c) {
       from = f;
@@ -27,13 +28,19 @@ public class BaseballElimination {
       flow+=x;
       check();
     }
+    void addFlow(int x, FlowNode f) {
+      if (f==from)
+        flow-=x;
+      else if (f==to)
+        flow+=x;
+    }
     void setFlow(int x) {
       flow = x;
       check();
     }
     void check() {
-      flow = min(capacity,flow);
-      flow = max(0,flow);
+      flow = Math.min(capacity,flow);
+      flow = Math.max(0,flow);
     }
     boolean full() {
       return flow==capacity;
@@ -41,11 +48,27 @@ public class BaseballElimination {
     boolean empty() {
       return flow==0;
     }
+    FlowNode other(FlowNode f) {
+      if (f==to)
+        return from;
+      else if (f==from)
+        return to;
+      return null;
+    }
+    int remainingCapacity(FlowNode f) {
+      if (f==from)
+        return flow;
+      else if (f==to)
+        return capacity-flow;
+      return 0;
+    }
   }
   private class FlowNode {
     ResizingArrayQueue<FlowEdge> in;
     ResizingArrayQueue<FlowEdge> out;
-    FlowNode() {
+    int val;
+    FlowNode(int x) {
+      val = x;
     }
     void edgeTo(FlowNode to) {
       edgeTo(to,Integer.MAX_VALUE);
@@ -58,10 +81,8 @@ public class BaseballElimination {
   }
   private Hashtable<String,Integer> names;
   private String[] iterableNames;
-  private FlowNode source;
-  private FlowNode sink;
-  private FlowNode[] games;
-  private FlowNode[] teams;
+  private FlowNode[] nodes;
+  private boolean[] marked;
   private int[] wins;
   private int[] losses;
   private int[] left;
@@ -70,15 +91,12 @@ public class BaseballElimination {
   public BaseballElimination(String filename) {
     In in = new In(filename);
     size = in.readInt();
-    names = new Hashtable<String,Integer>;
+    names = new Hashtable<String,Integer>();
     iterableNames = new String[size];
     wins = new int[size];
     losses = new int[size];
     left = new int[size];
-    source = new FlowNode();
-    sink = new FlowNode();
-    games = new FlowNode[size*(size-1)];
-    teams = new FlowNode[size];
+    nodes = new FlowNode[size*size+2];
     temp = new int[size][size];
     for (int i = 0; i<size; i++) {
       String name = in.readString();
@@ -91,19 +109,21 @@ public class BaseballElimination {
         temp[i][j] = in.readInt();
     }
     int count = 0;
+    nodes[nodes.length-1] = new FlowNode(nodes.length-1);
+    nodes[nodes.length-2] = new FlowNode(nodes.length-2);
     for (int i = 0; i<size; i++) { 
-      team = new FlowNode();
-      teams[i] = team;
-      team.edgeTo(sink);
+      FlowNode team = new FlowNode(size*(size-1)+i);
+      nodes[size*(size-1)+i] = team;
+      team.edgeTo(nodes[nodes.length-1]);
     }
     for (int i = 0; i<size; i++) {
       for (int j = 0; j<i; j++) {
         if (i!=j) {
-          FlowNode game = new FlowNode();
-          games[count] = game;
-          source.edgeTo(game,temp[i][j]);
-          game.edgeTo(teams[i]);
-          game.edgeTo(teams[j]);
+          FlowNode game = new FlowNode(count);
+          nodes[count] = game;
+          nodes[nodes.length-2].edgeTo(game,temp[i][j]);
+          game.edgeTo(nodes[size*(size-1)+i]);
+          game.edgeTo(nodes[size*(size-1)+j]);
           count++;
         }
       }
@@ -144,12 +164,82 @@ public class BaseballElimination {
     return left[names.get(team)];
   }// number of remaining games for given team
   public              int against(String team1, String team2) {
-    if (!names.containsKey(team1))||!names.containsKey(team2))
+    if (!names.containsKey(team1)||!names.containsKey(team2))
       throw new IllegalArgumentException();
     return temp[names.get(team1)][names.get(team2)];
   }// number of remaining games between team1 and team2
   public          boolean isEliminated(String team) {
+    if (!names.containsKey(team))
+      throw new IllegalArgumentException();
+    int num = names.get(team);
+    int count = 0;
+    for (FlowEdge edge : nodes[nodes.length-1].in) {
+      edge.setCapacity(wins[num]+left[num]-wins[count]);
+      count++;
+    }
+    ResizingArrayQueue<FlowNode> q = new ResizingArrayQueue<FlowNode>();
+    marked = new boolean[nodes.length];
+    q.enqueue(nodes[nodes.length-2]);
+    marked[nodes.length-2] = true;
+    while (!q.isEmpty()) {
+      FlowNode n = q.dequeue();
+      for (FlowEdge edge : n.out) {
+        FlowNode m = edge.to;
+        if (!marked[m.val]) {
+          edge.setFlow(0);
+          marked[m.val] = true;
+          q.enqueue(edge.to);
+        }
+      }
+    }
+    while (true) {
+      q = new ResizingArrayQueue<FlowNode>();
+      marked = new boolean[nodes.length];
+      FlowEdge[] edgeTo = new FlowEdge[nodes.length];
+      while (!q.isEmpty()) {
+        FlowNode n = q.dequeue();
+        for (FlowEdge edge : n.out) {
+          FlowNode m = edge.to;
+          if (!marked[m.val]&&!edge.full()) {
+            edgeTo[m.val] = edge;
+            marked[m.val] = true;
+            q.enqueue(m);
+          }
+        }
+        for (FlowEdge edge : n.in) {
+          FlowNode m = edge.from;
+          if (!marked[m.val]&&!edge.empty()) {
+            edgeTo[m.val] = edge;
+            marked[m.val] = true;
+            q.enqueue(m);
+          }
+        }
+      }
+      if (!marked[nodes.length-1])
+        break;
+      int bottle = Integer.MAX_VALUE;
+      FlowNode n = nodes[nodes.length-2];
+      for (n = edgeTo[n.val].other(n); n!=nodes[nodes.length-1]; n = edgeTo[n.val].other(n)) 
+        bottle = Math.min(bottle,edgeTo[n.val].remainingCapacity(n));
+      n = nodes[nodes.length-2];
+      for (n = edgeTo[n.val].other(n); n!=nodes[nodes.length-1]; n = edgeTo[n.val].other(n))
+        edgeTo[n.val].addFlow(bottle,n);
+    }
+    for (FlowEdge edge : nodes[nodes.length-2].out) {
+      if (!edge.full())
+        return false;
+    }
+    return true;
   }// is given team eliminated?
   public Iterable<String> certificateOfElimination(String team) {
+    if (!names.containsKey(team))
+      throw new IllegalArgumentException();
+    isEliminated(team);
+    ResizingArrayQueue<String> elims = new ResizingArrayQueue<String>();
+    for (int i = 0; i<size; i++) {
+      if (!marked[size*(size-1)+i]) 
+        elims.enqueue(iterableNames[size*(size-1)+i]);
+    }
+    return elims;
   }// subset R of teams that eliminates given team; null if not eliminated
 }
