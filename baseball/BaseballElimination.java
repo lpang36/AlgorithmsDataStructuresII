@@ -6,6 +6,7 @@ import java.lang.Math;
 import edu.princeton.cs.algs4.In;
 import edu.princeton.cs.algs4.StdOut;
 import edu.princeton.cs.algs4.ResizingArrayQueue;
+import edu.princeton.cs.algs4.FordFulkerson;
 
 public class BaseballElimination {
   private class FlowEdge {
@@ -170,7 +171,7 @@ public class BaseballElimination {
     nodes[nodes.length-2] = new FlowNode(nodes.length-2);
     for (int i = 0; i<size; i++) { 
       if (i!=num) {
-        FlowNode teamNode = new FlowNode(gameSize+i);
+        FlowNode teamNode = new FlowNode(gameSize+count);
         nodes[gameSize+count] = teamNode;
         teamNode.edgeTo(nodes[nodes.length-1]);
         count++;
@@ -221,6 +222,8 @@ public class BaseballElimination {
       q = new ResizingArrayQueue<FlowNode>();
       marked = new boolean[nodes.length];
       FlowEdge[] edgeTo = new FlowEdge[nodes.length];
+      q.enqueue(nodes[nodes.length-2]);
+      marked[nodes.length-2] = true;
       while (!q.isEmpty()) {
         FlowNode n = q.dequeue();
         for (FlowEdge edge : n.out) {
@@ -243,40 +246,40 @@ public class BaseballElimination {
       if (!marked[nodes.length-1])
         break;
       int bottle = Integer.MAX_VALUE;
-      FlowNode n = nodes[nodes.length-2];
-      for (n = edgeTo[n.val].other(n); n!=nodes[nodes.length-1]; n = edgeTo[n.val].other(n)) 
+      for (FlowNode n = nodes[nodes.length-1]; n!=nodes[nodes.length-2]; n = edgeTo[n.val].other(n)) 
         bottle = Math.min(bottle,edgeTo[n.val].remainingCapacity(n));
-      n = nodes[nodes.length-2];
-      for (n = edgeTo[n.val].other(n); n!=nodes[nodes.length-1]; n = edgeTo[n.val].other(n))
+      for (FlowNode n = nodes[nodes.length-1]; n!=nodes[nodes.length-2]; n = edgeTo[n.val].other(n)) 
         edgeTo[n.val].addFlow(bottle,n);
     }
     for (FlowEdge edge : nodes[nodes.length-2].out) {
       if (!edge.full())
-        return false;
+        return true;
     }
-    return true;
+    return false;
   }// is given team eliminated?
   public Iterable<String> certificateOfElimination(String team) {
     if (!names.containsKey(team))
       throw new IllegalArgumentException();
     int num = names.get(team);
-    isEliminated(team);
-    ResizingArrayQueue<String> elims = new ResizingArrayQueue<String>();
-    int count = 0;
-    for (int i = 0; i<size; i++) {
-      if (trivialElimination&&wins[num]+left[num]<wins[i]) 
-        elims.enqueue(iterableNames[i]);
-      else if (!trivialElimination&&!marked[gameSize+count]&&i!=num) {
-        elims.enqueue(iterableNames[i]);
-        count++;
+    if (isEliminated(team)) {
+      ResizingArrayQueue<String> elims = new ResizingArrayQueue<String>();
+      int count = 0;
+      for (int i = 0; i<size; i++) {
+        if (trivialElimination&&wins[num]+left[num]<wins[i]) 
+          elims.enqueue(iterableNames[i]);
+        else if (!trivialElimination&&i!=num) {
+          if (marked[gameSize+count])
+            elims.enqueue(iterableNames[i]);
+          count++;
+        }
       }
+      return elims;
     }
-    return elims;
+    return null;
   }// subset R of teams that eliminates given team; null if not eliminated
   public static void main(String[] args) {
     BaseballElimination division = new BaseballElimination(args[0]);
-    String team = "Philadelphia";
-    //for (String team : division.teams()) {
+    for (String team : division.teams()) {
         if (division.isEliminated(team)) {
             StdOut.print(team + " is eliminated by the subset R = { ");
             for (String t : division.certificateOfElimination(team)) {
@@ -287,6 +290,6 @@ public class BaseballElimination {
         else {
             StdOut.println(team + " is not eliminated");
         }
-    //}
+    }
   }
 }
