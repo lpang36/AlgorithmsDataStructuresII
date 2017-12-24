@@ -4,6 +4,7 @@ import java.util.Iterator;
 import java.lang.IllegalArgumentException;
 import java.lang.Math;
 import edu.princeton.cs.algs4.In;
+import edu.princeton.cs.algs4.StdOut;
 import edu.princeton.cs.algs4.ResizingArrayQueue;
 
 public class BaseballElimination {
@@ -69,6 +70,8 @@ public class BaseballElimination {
     int val;
     FlowNode(int x) {
       val = x;
+      in = new ResizingArrayQueue<FlowEdge>();
+      out = new ResizingArrayQueue<FlowEdge>();
     }
     void edgeTo(FlowNode to) {
       edgeTo(to,Integer.MAX_VALUE);
@@ -88,6 +91,9 @@ public class BaseballElimination {
   private int[] left;
   private int[][] temp;
   private int size;
+  private int maxWins;
+  private boolean trivialElimination;
+  private int gameSize;
   public BaseballElimination(String filename) {
     In in = new In(filename);
     size = in.readInt();
@@ -96,37 +102,19 @@ public class BaseballElimination {
     wins = new int[size];
     losses = new int[size];
     left = new int[size];
-    nodes = new FlowNode[size*size+2];
     temp = new int[size][size];
+    maxWins = 0;
+    gameSize = (size-1)*(size-2)/2;
     for (int i = 0; i<size; i++) {
       String name = in.readString();
       names.put(name,i);
       iterableNames[i] = name;
       wins[i] = in.readInt();
+      maxWins = Math.max(maxWins,wins[i]);
       losses[i] = in.readInt();
       left[i] = in.readInt();
       for (int j = 0; j<size; j++) 
         temp[i][j] = in.readInt();
-    }
-    int count = 0;
-    nodes[nodes.length-1] = new FlowNode(nodes.length-1);
-    nodes[nodes.length-2] = new FlowNode(nodes.length-2);
-    for (int i = 0; i<size; i++) { 
-      FlowNode team = new FlowNode(size*(size-1)+i);
-      nodes[size*(size-1)+i] = team;
-      team.edgeTo(nodes[nodes.length-1]);
-    }
-    for (int i = 0; i<size; i++) {
-      for (int j = 0; j<i; j++) {
-        if (i!=j) {
-          FlowNode game = new FlowNode(count);
-          nodes[count] = game;
-          nodes[nodes.length-2].edgeTo(game,temp[i][j]);
-          game.edgeTo(nodes[size*(size-1)+i]);
-          game.edgeTo(nodes[size*(size-1)+j]);
-          count++;
-        }
-      }
     }
   }// create a baseball division from given filename in format specified below
   public              int numberOfTeams() {
@@ -172,10 +160,47 @@ public class BaseballElimination {
     if (!names.containsKey(team))
       throw new IllegalArgumentException();
     int num = names.get(team);
+    trivialElimination = true;
+    if (wins[num]+left[num]<maxWins)
+      return true;
+    trivialElimination = false;
     int count = 0;
+    nodes = new FlowNode[gameSize+size+1];
+    nodes[nodes.length-1] = new FlowNode(nodes.length-1);
+    nodes[nodes.length-2] = new FlowNode(nodes.length-2);
+    for (int i = 0; i<size; i++) { 
+      if (i!=num) {
+        FlowNode teamNode = new FlowNode(gameSize+i);
+        nodes[gameSize+count] = teamNode;
+        teamNode.edgeTo(nodes[nodes.length-1]);
+        count++;
+      }
+    }
+    count = 0;
+    int counti = 0;
+    for (int i = 0; i<size; i++) {
+      int countj = counti+1;
+      if (i!=num) {
+        for (int j = i+1; j<size; j++) {
+          if (j!=num) {
+            FlowNode game = new FlowNode(count);
+            nodes[count] = game;
+            nodes[nodes.length-2].edgeTo(game,temp[i][j]);
+            game.edgeTo(nodes[gameSize+counti]);
+            game.edgeTo(nodes[gameSize+countj]);
+            count++;
+            countj++;
+          }
+        }
+        counti++;
+      }
+    }
+    count = -1;
     for (FlowEdge edge : nodes[nodes.length-1].in) {
-      edge.setCapacity(wins[num]+left[num]-wins[count]);
       count++;
+      if (count==num)
+        count++;
+      edge.setCapacity(wins[num]+left[num]-wins[count]);
     }
     ResizingArrayQueue<FlowNode> q = new ResizingArrayQueue<FlowNode>();
     marked = new boolean[nodes.length];
@@ -234,12 +259,34 @@ public class BaseballElimination {
   public Iterable<String> certificateOfElimination(String team) {
     if (!names.containsKey(team))
       throw new IllegalArgumentException();
+    int num = names.get(team);
     isEliminated(team);
     ResizingArrayQueue<String> elims = new ResizingArrayQueue<String>();
+    int count = 0;
     for (int i = 0; i<size; i++) {
-      if (!marked[size*(size-1)+i]) 
-        elims.enqueue(iterableNames[size*(size-1)+i]);
+      if (trivialElimination&&wins[num]+left[num]<wins[i]) 
+        elims.enqueue(iterableNames[i]);
+      else if (!trivialElimination&&!marked[gameSize+count]&&i!=num) {
+        elims.enqueue(iterableNames[i]);
+        count++;
+      }
     }
     return elims;
   }// subset R of teams that eliminates given team; null if not eliminated
+  public static void main(String[] args) {
+    BaseballElimination division = new BaseballElimination(args[0]);
+    String team = "Philadelphia";
+    //for (String team : division.teams()) {
+        if (division.isEliminated(team)) {
+            StdOut.print(team + " is eliminated by the subset R = { ");
+            for (String t : division.certificateOfElimination(team)) {
+                StdOut.print(t + " ");
+            }
+            StdOut.println("}");
+        }
+        else {
+            StdOut.println(team + " is not eliminated");
+        }
+    //}
+  }
 }
