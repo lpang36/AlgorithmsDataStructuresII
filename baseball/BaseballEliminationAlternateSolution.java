@@ -7,13 +7,86 @@ import edu.princeton.cs.algs4.In;
 import edu.princeton.cs.algs4.StdOut;
 import edu.princeton.cs.algs4.ResizingArrayQueue;
 import edu.princeton.cs.algs4.FordFulkerson;
-import edu.princeton.cs.algs4.FlowNetwork;
-import edu.princeton.cs.algs4.FlowEdge;
 
-public class BaseballElimination {
+public class BaseballEliminationAlternateSolution {
+  private class FlowEdge {
+    FlowNode from;
+    FlowNode to;
+    int capacity;
+    int flow;
+    FlowEdge(FlowNode f, FlowNode t) {
+      this(f,t,Integer.MAX_VALUE);
+    }
+    FlowEdge(FlowNode f, FlowNode t, int c) {
+      from = f;
+      to = t;
+      capacity = c;
+      flow = 0;
+    }
+    void setCapacity(int x) {
+      capacity = x;
+    }
+    void addFlow(int x) {
+      flow+=x;
+      check();
+    }
+    void addFlow(int x, FlowNode f) {
+      if (f==from)
+        flow-=x;
+      else if (f==to)
+        flow+=x;
+    }
+    void setFlow(int x) {
+      flow = x;
+      check();
+    }
+    void check() {
+      flow = Math.min(capacity,flow);
+      flow = Math.max(0,flow);
+    }
+    boolean full() {
+      return flow==capacity;
+    }
+    boolean empty() {
+      return flow==0;
+    }
+    FlowNode other(FlowNode f) {
+      if (f==to)
+        return from;
+      else if (f==from)
+        return to;
+      return null;
+    }
+    int remainingCapacity(FlowNode f) {
+      if (f==from)
+        return flow;
+      else if (f==to)
+        return capacity-flow;
+      return 0;
+    }
+  }
+  private class FlowNode {
+    ResizingArrayQueue<FlowEdge> in;
+    ResizingArrayQueue<FlowEdge> out;
+    int val;
+    FlowNode(int x) {
+      val = x;
+      in = new ResizingArrayQueue<FlowEdge>();
+      out = new ResizingArrayQueue<FlowEdge>();
+    }
+    void edgeTo(FlowNode to) {
+      edgeTo(to,Integer.MAX_VALUE);
+    }
+    void edgeTo(FlowNode to, int c) {
+      FlowEdge edge = new FlowEdge(this,to,c);
+      out.enqueue(edge);
+      to.in.enqueue(edge);
+    }
+  }
   private Hashtable<String,Integer> names;
   private String[] iterableNames;
-  private FordFulkerson FF;
+  private FlowNode[] nodes;
+  private boolean[] marked;
   private int[] wins;
   private int[] losses;
   private int[] left;
@@ -22,7 +95,7 @@ public class BaseballElimination {
   private int maxWins;
   private boolean trivialElimination;
   private int gameSize;
-  public BaseballElimination(String filename) {
+  public BaseballEliminationAlternateSolution(String filename) {
     In in = new In(filename);
     size = in.readInt();
     names = new Hashtable<String,Integer>();
@@ -93,11 +166,14 @@ public class BaseballElimination {
       return true;
     trivialElimination = false;
     int count = 0;
-    FlowNetwork nodes = new FlowNetwork(gameSize+size+1);
+    nodes = new FlowNode[gameSize+size+1];
+    nodes[nodes.length-1] = new FlowNode(nodes.length-1);
+    nodes[nodes.length-2] = new FlowNode(nodes.length-2);
     for (int i = 0; i<size; i++) { 
       if (i!=num) {
-        FlowEdge edge = new FlowEdge(gameSize+count,nodes.V()-1,wins[num]+left[num]-wins[i]);
-        nodes.addEdge(edge);
+        FlowNode teamNode = new FlowNode(gameSize+count);
+        nodes[gameSize+count] = teamNode;
+        teamNode.edgeTo(nodes[nodes.length-1]);
         count++;
       }
     }
@@ -108,12 +184,11 @@ public class BaseballElimination {
       if (i!=num) {
         for (int j = i+1; j<size; j++) {
           if (j!=num) {
-            FlowEdge edge1 = new FlowEdge(nodes.V()-2,count,temp[i][j]);
-            FlowEdge edge2 = new FlowEdge(count,gameSize+counti,Integer.MAX_VALUE);
-            FlowEdge edge3 = new FlowEdge(count,gameSize+countj,Integer.MAX_VALUE);
-            nodes.addEdge(edge1);
-            nodes.addEdge(edge2);
-            nodes.addEdge(edge3);
+            FlowNode game = new FlowNode(count);
+            nodes[count] = game;
+            nodes[nodes.length-2].edgeTo(game,temp[i][j]);
+            game.edgeTo(nodes[gameSize+counti]);
+            game.edgeTo(nodes[gameSize+countj]);
             count++;
             countj++;
           }
@@ -121,9 +196,63 @@ public class BaseballElimination {
         counti++;
       }
     }
-    FF = new FordFulkerson(nodes,nodes.V()-2,nodes.V()-1);
-    for (FlowEdge edge : nodes.adj(nodes.V()-2)) {
-      if (edge.capacity()!=edge.flow())
+    count = -1;
+    for (FlowEdge edge : nodes[nodes.length-1].in) {
+      count++;
+      if (count==num)
+        count++;
+      edge.setCapacity(wins[num]+left[num]-wins[count]);
+    }
+    ResizingArrayQueue<FlowNode> q = new ResizingArrayQueue<FlowNode>();
+    marked = new boolean[nodes.length];
+    q.enqueue(nodes[nodes.length-2]);
+    marked[nodes.length-2] = true;
+    while (!q.isEmpty()) {
+      FlowNode n = q.dequeue();
+      for (FlowEdge edge : n.out) {
+        FlowNode m = edge.to;
+        if (!marked[m.val]) {
+          edge.setFlow(0);
+          marked[m.val] = true;
+          q.enqueue(edge.to);
+        }
+      }
+    }
+    while (true) {
+      q = new ResizingArrayQueue<FlowNode>();
+      marked = new boolean[nodes.length];
+      FlowEdge[] edgeTo = new FlowEdge[nodes.length];
+      q.enqueue(nodes[nodes.length-2]);
+      marked[nodes.length-2] = true;
+      while (!q.isEmpty()) {
+        FlowNode n = q.dequeue();
+        for (FlowEdge edge : n.out) {
+          FlowNode m = edge.to;
+          if (!marked[m.val]&&!edge.full()) {
+            edgeTo[m.val] = edge;
+            marked[m.val] = true;
+            q.enqueue(m);
+          }
+        }
+        for (FlowEdge edge : n.in) {
+          FlowNode m = edge.from;
+          if (!marked[m.val]&&!edge.empty()) {
+            edgeTo[m.val] = edge;
+            marked[m.val] = true;
+            q.enqueue(m);
+          }
+        }
+      }
+      if (!marked[nodes.length-1])
+        break;
+      int bottle = Integer.MAX_VALUE;
+      for (FlowNode n = nodes[nodes.length-1]; n!=nodes[nodes.length-2]; n = edgeTo[n.val].other(n)) 
+        bottle = Math.min(bottle,edgeTo[n.val].remainingCapacity(n));
+      for (FlowNode n = nodes[nodes.length-1]; n!=nodes[nodes.length-2]; n = edgeTo[n.val].other(n)) 
+        edgeTo[n.val].addFlow(bottle,n);
+    }
+    for (FlowEdge edge : nodes[nodes.length-2].out) {
+      if (!edge.full())
         return true;
     }
     return false;
@@ -139,7 +268,7 @@ public class BaseballElimination {
         if (trivialElimination&&wins[num]+left[num]<wins[i]) 
           elims.enqueue(iterableNames[i]);
         else if (!trivialElimination&&i!=num) {
-          if (FF.inCut(gameSize+count))
+          if (marked[gameSize+count])
             elims.enqueue(iterableNames[i]);
           count++;
         }
@@ -149,7 +278,7 @@ public class BaseballElimination {
     return null;
   }// subset R of teams that eliminates given team; null if not eliminated
   public static void main(String[] args) {
-    BaseballElimination division = new BaseballElimination(args[0]);
+    BaseballEliminationAlternateSolution division = new BaseballEliminationAlternateSolution(args[0]);
     for (String team : division.teams()) {
         if (division.isEliminated(team)) {
             StdOut.print(team + " is eliminated by the subset R = { ");
