@@ -13,7 +13,7 @@ public class MoveToFront {
     while(!BinaryStdIn.isEmpty()) {
       int c = (int)BinaryStdIn.readChar();
       int pos = c;
-      int start = 0;
+      int start = -1;
       if (last[c]!=-1) {
         pos = 0;
         start = last[c];
@@ -25,9 +25,10 @@ public class MoveToFront {
       last[c] = count;
       s.add(pos);
       count++;
-      //System.out.println((char)pos);
+      //System.out.println(pos);
       BinaryStdOut.write(pos,8);
     }
+    BinaryStdOut.close();
   }
 
     // apply move-to-front decoding, reading from standard input and writing to standard output
@@ -54,6 +55,7 @@ public class MoveToFront {
       //System.out.println((char)out);
       BinaryStdOut.write(out,8);
     }
+    BinaryStdOut.close();
   }
 
     // if args[0] is '-', apply move-to-front encoding

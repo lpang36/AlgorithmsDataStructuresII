@@ -22,6 +22,7 @@ public class BurrowsWheeler {
       sb.append(s.charAt((csa.index(i)-1+s.length())%s.length()));
     //System.out.println(sb.toString());
     BinaryStdOut.write(sb.toString());
+    BinaryStdOut.close();
   }
 
     // apply Burrows-Wheeler inverse transform, reading from standard input and writing to standard output
@@ -50,6 +51,7 @@ public class BurrowsWheeler {
       sb.append(sorted[i]);
     //System.out.println(sb.toString());
     BinaryStdOut.write(sb.toString());
+    BinaryStdOut.close();
   }
 
     // if args[0] is '-', apply Burrows-Wheeler transform
